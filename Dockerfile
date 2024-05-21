@@ -1,43 +1,11 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
+FROM golang:alpine AS build
 
-# ===================================
-# 
-#   Release image
-#
-# ===================================
-FROM alpine:latest AS release-default
+RUN apk update && apk add --no-cache git ca-certificates libcap
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /consul-esm
 
-ARG BIN_NAME=consul-esm
-# Export BIN_NAME for the CMD below, it can't see ARGs directly.
-ENV BIN_NAME=$BIN_NAME
-ARG PRODUCT_VERSION
-ARG PRODUCT_REVISION
-ENV PRODUCT_NAME=$BIN_NAME
-# TARGETARCH and TARGETOS are set automatically when --platform is provided.
-ARG TARGETOS TARGETARCH
-
-LABEL maintainer="John Eikenberry <jae@zhar.net>" \
-          org.opencontainers.image.licenses="MPL-2.0"
-# version label is required for build process
-LABEL version=$PRODUCT_VERSION
-LABEL revision=$PRODUCT_REVISION
-
-# These are the defaults, this makes them explicit and overridable.
-ARG UID=100
-ARG GID=1000
-# Create a non-root user to run the software.
-RUN addgroup -g ${GID} ${BIN_NAME} \
-    && adduser -u ${UID} -S -G ${BIN_NAME} ${BIN_NAME}
-
-COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
-# where the build system stores the builds
-COPY ./dist/$TARGETOS/$TARGETARCH/$BIN_NAME /bin/
-
-# entrypoint
-COPY ./.release/docker-entrypoint.sh /bin/
-ENTRYPOINT ["/bin/docker-entrypoint.sh"]
-
-USER ${BIN_NAME}:${BIN_NAME}
-CMD /bin/$BIN_NAME
-
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /consul-esm /usr/bin/
+ENTRYPOINT ["/usr/bin/consul-esm"]
