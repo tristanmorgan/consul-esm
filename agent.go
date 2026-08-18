@@ -269,7 +269,7 @@ func (a *Agent) Run() error {
 	}()
 
 	a.ready <- struct{}{} // used for testing
-	defer func() { // be sure to drain it between calls
+	defer func() {        // be sure to drain it between calls
 		select {
 		case <-a.ready:
 		default:
